@@ -41,20 +41,6 @@ class CalendarApp:
                            background="#ffffff",
                            relief="flat")
         
-        self.style.configure("DayCell.TFrame",
-                           background="#ffffff",
-                           relief="flat",
-                           borderwidth=1)
-        
-        self.style.configure("Selected.TFrame",
-                           background="#e3f2fd",
-                           relief="solid",
-                           borderwidth=2)
-        
-        self.style.configure("Today.TLabel",
-                           background="#bbdefb",
-                           font=('Helvetica', 10, 'bold'))
-        
         self.style.configure("DayHeader.TLabel",
                            font=('Helvetica', 10, 'bold'),
                            padding=10,
@@ -162,25 +148,38 @@ class CalendarApp:
         for i in range(num_weeks + 1):  # +1 for the header row
             self.calendar_frame.grid_rowconfigure(i, weight=1)
         
-        # Create day cells
+        # Create day cells using tk.Frame for direct background control
         row, col = 1, start_day
         for day in range(1, days_in_month.day + 1):
-            day_frame = ttk.Frame(self.calendar_frame, style="DayCell.TFrame")
+            day_frame = tk.Frame(self.calendar_frame, bg="#ffffff", relief="flat", borderwidth=1)
             day_frame.grid(row=row, column=col, sticky="nsew", padx=1, pady=1)
             day_frame.grid_columnconfigure(0, weight=1)
             day_frame.grid_rowconfigure(0, weight=1)
+            day_frame.original_bg = "#ffffff"
             
-            # Create day content frame to hold label and event indicator
-            content_frame = ttk.Frame(day_frame)
+            # Check if today
+            today = False
+            if (self.current_date.year == datetime.now().year and
+                self.current_date.month == datetime.now().month and
+                day == datetime.now().day):
+                day_frame.configure(bg="#bbdefb")
+                day_frame.original_bg = "#bbdefb"
+                today = True
+            
+            # Create content frame with inherited background
+            content_frame = tk.Frame(day_frame, bg=day_frame['bg'])
             content_frame.grid(row=0, column=0, sticky="nsew")
             content_frame.grid_columnconfigure(0, weight=1)
             
             # Day label
-            day_label = ttk.Label(content_frame,
+            day_label = tk.Label(content_frame,
                                 text=str(day),
+                                bg=content_frame['bg'],
                                 anchor="center",
-                                padding=10)
-            day_label.grid(row=0, column=0, sticky="nsew")
+                                font=('Helvetica', 10))
+            if today:
+                day_label.config(font=('Helvetica', 10, 'bold'))
+            day_label.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
             
             # Event indicator
             date_str = self.current_date.replace(day=day).strftime("%Y-%m-%d")
@@ -189,12 +188,6 @@ class CalendarApp:
                                   bg=self.events[date_str][0]['color'],
                                   height=4)
                 indicator.grid(row=1, column=0, sticky="ew")
-            
-            # Highlight today
-            if (self.current_date.year == datetime.now().year and
-                self.current_date.month == datetime.now().month and
-                day == datetime.now().day):
-                day_label.config(style="Today.TLabel")
             
             # Store the day number
             day_frame.day_number = day
@@ -214,50 +207,37 @@ class CalendarApp:
         
         # Fill remaining cells with empty frames to maintain grid structure
         while col <= 6:
-            empty_frame = ttk.Frame(self.calendar_frame, style="DayCell.TFrame")
+            empty_frame = tk.Frame(self.calendar_frame, bg="#ffffff", relief="flat", borderwidth=1)
             empty_frame.grid(row=row, column=col, sticky="nsew", padx=1, pady=1)
             col += 1
     
     def handle_day_click(self, event):
-        # Get the clicked widget and find its day number
         widget = event.widget
         day = getattr(widget, 'day_number', None)
         
         if day is None:
-            # Try to get day from parent if it's a child widget
             day = getattr(widget.master, 'day_number', None)
         
         if day is not None:
-            # Find the day frame (it's either the widget or its parent)
             frame = widget
-            while frame and not isinstance(frame, ttk.Frame):
+            while frame and not (hasattr(frame, 'day_number') and frame.master == self.calendar_frame):
                 frame = frame.master
-                
-            if frame and hasattr(frame, 'day_number'):
+            if frame:
                 self.select_day(day, frame)
 
     def select_day(self, day, day_frame):
-        # Reset previous selection without disturbing the grid
+        # Reset previous selection
         if self.selected_day:
             try:
-                # Find the actual day frame if we're dealing with a child widget
-                prev_frame = self.selected_day
-                if not isinstance(prev_frame, ttk.Frame):
-                    prev_frame = prev_frame.master
-                prev_frame.configure(style="DayCell.TFrame")
-            except tk.TclError:
-                pass  # Handle case where previous frame was destroyed
+                self.selected_day.configure(bg=self.selected_day.original_bg)
+            except (tk.TclError, AttributeError):
+                pass
         
-        # Find the actual day frame if we're dealing with a child widget
-        actual_day_frame = day_frame
-        if not isinstance(day_frame, ttk.Frame):
-            actual_day_frame = day_frame.master
-            
-        # Apply selection styling without modifying grid structure
-        actual_day_frame.configure(style="Selected.TFrame")
-        self.selected_day = actual_day_frame
+        # Apply new selection
+        day_frame.configure(bg="#e3f2fd")
+        self.selected_day = day_frame
         
-        # Set selected date and update events display
+        # Update events display
         self.selected_date = self.current_date.replace(day=day).strftime("%Y-%m-%d")
         self.show_events(day)
 
