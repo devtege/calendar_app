@@ -176,9 +176,7 @@ class CalendarApp:
                                 text=str(day),
                                 bg=content_frame['bg'],
                                 anchor="center",
-                                font=('Helvetica', 10))
-            if today:
-                day_label.config(font=('Helvetica', 10, 'bold'))
+                                font=('Helvetica', 10, 'bold' if today else 'normal'))
             day_label.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
             
             # Event indicator
